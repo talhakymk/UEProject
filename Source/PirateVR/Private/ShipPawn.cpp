@@ -40,6 +40,7 @@ AShipPawn::AShipPawn()
 void AShipPawn::BeginPlay()
 {
 	Super::BeginPlay();
+   
 }
 
 void AShipPawn::Tick(float DeltaTime)
@@ -137,13 +138,45 @@ void AShipPawn::TurnCamera(float Value)
 
 void AShipPawn::Fire()
 {
+    if (GEngine)
+    {
+        // Ekrana mesaj yazdýr
+        GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, TEXT("Fire function called!"));
+    }
+
     if (CannonballClass)
     {
-        // Gemi pozisyonu ve yönü
-        FVector SpawnLocation = BoatMesh->GetComponentLocation() + (GetActorForwardVector() * 200.0f); // Gemi önünden ateþle
-        FRotator SpawnRotation = GetActorRotation();
+        // Gemi sað tarafýna göre spawn pozisyonunu belirle
+        FVector SpawnLocation = BoatMesh->GetComponentLocation() +
+            (GetActorForwardVector() * 15.0f) +  // Geminin ön kýsmýna bir miktar uzaklýk
+            (GetActorRightVector() * 30.0f);    // Geminin sað tarafýna bir miktar uzaklýk
 
-        // Cannonball'u spawn et
-        GetWorld()->SpawnActor<AActor>(CannonballClass, SpawnLocation, SpawnRotation);
+        // Gemi sað yönüne doðru rotasyonu ayarla
+        FRotator SpawnRotation = GetActorRightVector().Rotation();
+
+        // Mermiyi spawn et
+        AActor* SpawnedCannonball = GetWorld()->SpawnActor<AActor>(CannonballClass, SpawnLocation, SpawnRotation);
+
+        if (SpawnedCannonball)
+        {
+            if (GEngine)
+            {
+                GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, TEXT("Cannonball spawned successfully to the right!"));
+            }
+        }
+        else
+        {
+            if (GEngine)
+            {
+                GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Failed to spawn Cannonball!"));
+            }
+        }
+    }
+    else
+    {
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("CannonballClass is not set!"));
+        }
     }
 }
