@@ -7,6 +7,5 @@
 
 APirateVRGameMode::APirateVRGameMode()
 {
-	DefaultPawnClass = AShipPawn::StaticClass(); // ShipPawn sýnýfýnýzý burada kullanýn
-
+	
 }

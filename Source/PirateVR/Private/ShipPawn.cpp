@@ -5,6 +5,7 @@
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 
+
 AShipPawn::AShipPawn()
 {
     PrimaryActorTick.bCanEverTick = true;
@@ -32,14 +33,24 @@ AShipPawn::AShipPawn()
     Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
     Camera->SetupAttachment(SpringArm);
 
-    // Automatically possess this pawn as Player 0
-    AutoPossessPlayer = EAutoReceiveInput::Player0;
 }
 
 // BeginPlay
 void AShipPawn::BeginPlay()
 {
 	Super::BeginPlay();
+
+    // Kamera kapatma iþlemi
+    if (!IsPlayer)
+    {
+        if (SpringArm) SpringArm->Deactivate();
+        if (Camera) Camera->Deactivate();
+    }
+
+    if (IsPlayer) {
+        // Automatically possess this pawn as Player 0
+        AutoPossessPlayer = EAutoReceiveInput::Player0;
+    } 
    
 }
 
@@ -153,6 +164,8 @@ void AShipPawn::Fire()
 
         // Gemi sað yönüne doðru rotasyonu ayarla
         FRotator SpawnRotation = GetActorRightVector().Rotation();
+        SpawnRotation.Pitch += 5.0f; // Negatif pitch yukarý yönlüdür
+
 
         // Mermiyi spawn et
         AActor* SpawnedCannonball = GetWorld()->SpawnActor<AActor>(CannonballClass, SpawnLocation, SpawnRotation);
@@ -161,7 +174,7 @@ void AShipPawn::Fire()
         {
             if (GEngine)
             {
-                GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, TEXT("Cannonball spawned successfully to the right!"));
+                GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, TEXT("Cannonballlll spawned successfully to the right!"));
             }
         }
         else

@@ -29,6 +29,10 @@ public:
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ship Control")
+	bool IsPlayer = true;
+
+
 private:
 	// Mesh component for the boat
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Components", meta = (AllowPrivateAccess = "true"))
@@ -71,12 +75,14 @@ private:
 
 	float SwayTime = 0.0f; // Internal timer for sway effect
 
+
 	// Movement logic
 	void MoveForward(float Value);
 	void Turn(float Value);
 	void TurnCamera(float Value);
 
 	// Fire Logic
+	UFUNCTION(BlueprintCallable, Category = "Combat")
 	void Fire(); //Fire Function
 
 	// Cannonball Blueprint Reference
