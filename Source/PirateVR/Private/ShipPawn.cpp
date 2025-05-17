@@ -15,7 +15,7 @@ AShipPawn::AShipPawn()
     RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("RootComponent")); // Yeni bir RootComponent ekleniyor
     BoatMesh->SetupAttachment(RootComponent); // BoatMesh'i yeni RootComponent'e baðlýyoruz
 
-    BoatMesh->SetRelativeRotation(FRotator(0.0f, 0.0f, 0.0f)); 
+    BoatMesh->SetRelativeRotation(FRotator(0.0f, 0.0f, 0.0f));
 
     // Disable physics simulation and gravity
     BoatMesh->SetSimulatePhysics(false);
@@ -38,7 +38,7 @@ AShipPawn::AShipPawn()
 // BeginPlay
 void AShipPawn::BeginPlay()
 {
-	Super::BeginPlay();
+    Super::BeginPlay();
 
     // Kamera kapatma iþlemi
     if (!IsPlayer)
@@ -50,8 +50,8 @@ void AShipPawn::BeginPlay()
     if (IsPlayer) {
         // Automatically possess this pawn as Player 0
         AutoPossessPlayer = EAutoReceiveInput::Player0;
-    } 
-   
+    }
+
 }
 
 void AShipPawn::Tick(float DeltaTime)
@@ -105,7 +105,7 @@ void AShipPawn::Tick(float DeltaTime)
 
     // Sabit su seviyesi
     NewLocation.Z = DesiredWaterLevelZ;
-    SetActorLocation(NewLocation);
+    SetActorLocation(NewLocation, true);
 
     // Sallanma efekti
     SwayTime += DeltaTime;
@@ -118,10 +118,10 @@ void AShipPawn::Tick(float DeltaTime)
 // Input setup
 void AShipPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
-	Super::SetupPlayerInputComponent(PlayerInputComponent);
+    Super::SetupPlayerInputComponent(PlayerInputComponent);
 
-	PlayerInputComponent->BindAxis("MoveForward", this, &AShipPawn::MoveForward);
-	PlayerInputComponent->BindAxis("Turn", this, &AShipPawn::Turn);
+    PlayerInputComponent->BindAxis("MoveForward", this, &AShipPawn::MoveForward);
+    PlayerInputComponent->BindAxis("Turn", this, &AShipPawn::Turn);
 
     PlayerInputComponent->BindAxis("TurnCamera", this, &AShipPawn::TurnCamera);
 
@@ -131,15 +131,15 @@ void AShipPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 // Forward movement input
 void AShipPawn::MoveForward(float Value)
 {
-	InputThrottle = Value;
+    InputThrottle = Value;
 }
 
 // Turning input
 void AShipPawn::Turn(float Value)
 {
-	FRotator NewRotation = GetActorRotation();
-	NewRotation.Yaw += Value * TurnSpeed * GetWorld()->GetDeltaSeconds();
-	SetActorRotation(NewRotation);
+    FRotator NewRotation = GetActorRotation();
+    NewRotation.Yaw += Value * TurnSpeed * GetWorld()->GetDeltaSeconds();
+    SetActorRotation(NewRotation);
 }
 
 void AShipPawn::TurnCamera(float Value)

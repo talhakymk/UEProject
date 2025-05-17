@@ -4,6 +4,7 @@
 #include "GameFramework/Pawn.h"
 #include "ShipPawn.generated.h"
 
+
 // Forward declarations
 class USpringArmComponent;
 class UCameraComponent;
@@ -31,6 +32,8 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ship Control")
 	bool IsPlayer = true;
+
+
 
 
 private:
