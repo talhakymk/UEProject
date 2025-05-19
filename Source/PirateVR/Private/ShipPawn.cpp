@@ -2,110 +2,111 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Components/InputComponent.h"
+#include "GameFramework/ProjectileMovementComponent.h"
+#include "Kismet/GameplayStatics.h"
 #include "Engine/World.h"
-#include "GameFramework/Actor.h"
-
 
 AShipPawn::AShipPawn()
 {
     PrimaryActorTick.bCanEverTick = true;
 
-    // Create Static Mesh Component
+    // Root
+    Root = CreateDefaultSubobject<USceneComponent>(TEXT("RootComponent"));
+    RootComponent = Root;
+
+    // Mesh
     BoatMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BoatMesh"));
-    RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("RootComponent")); // Yeni bir RootComponent ekleniyor
-    BoatMesh->SetupAttachment(RootComponent); // BoatMesh'i yeni RootComponent'e baðlýyoruz
-
-    BoatMesh->SetRelativeRotation(FRotator(0.0f, 0.0f, 0.0f));
-
-    // Disable physics simulation and gravity
+    BoatMesh->SetupAttachment(RootComponent);
     BoatMesh->SetSimulatePhysics(false);
     BoatMesh->SetEnableGravity(false);
     BoatMesh->SetMobility(EComponentMobility::Movable);
 
-    // Create a Spring Arm for the camera
+    // Camera System
     SpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
-    SpringArm->SetupAttachment(RootComponent); // SpringArm artýk RootComponent'e baðlý
-    SpringArm->TargetArmLength = 300.0f; // Distance from the ship
-    SpringArm->bUsePawnControlRotation = true; // Rotate based on controller input
-    SpringArm->SetRelativeLocation(FVector(0.0f, 0.0f, 100.0f)); // Position above the ship
+    SpringArm->SetupAttachment(RootComponent);
+    SpringArm->TargetArmLength = 300.0f;
+    SpringArm->bUsePawnControlRotation = true;
+    SpringArm->SetRelativeLocation(FVector(0.0f, 0.0f, 100.0f));
 
-    // Create a Camera and attach it to the Spring Arm
+
     Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
     Camera->SetupAttachment(SpringArm);
 
+    
+    // Movement Component
+    ProjectileMovementComponent = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovementComponent"));
+    ProjectileMovementComponent->UpdatedComponent = RootComponent;
+    ProjectileMovementComponent->bRotationFollowsVelocity = false;
+    ProjectileMovementComponent->bShouldBounce = false;
+    ProjectileMovementComponent->ProjectileGravityScale = 0.0f;
 }
 
-// BeginPlay
 void AShipPawn::BeginPlay()
 {
     Super::BeginPlay();
 
-    // Kamera kapatma iþlemi
     if (!IsPlayer)
     {
         if (SpringArm) SpringArm->Deactivate();
         if (Camera) Camera->Deactivate();
     }
 
-    if (IsPlayer) {
-        // Automatically possess this pawn as Player 0
+    if (IsPlayer)
+    {
         AutoPossessPlayer = EAutoReceiveInput::Player0;
     }
-
 }
 
 void AShipPawn::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
 
-    // Eðer ileri hareket varsa
+    // Ývme hesaplama
     if (InputThrottle > 0.0f)
     {
-        // Eðer gemi geri gidiyorsa, önce durmasý gerekiyor
         if (CurrentSpeed < 0.0f)
         {
-            CurrentSpeed = FMath::Min(CurrentSpeed + Deceleration * DeltaTime, 0.0f); // Yavaþça sýfýra getir
+            CurrentSpeed = FMath::Min(CurrentSpeed + Deceleration * DeltaTime, 0.0f);
         }
         else
         {
-            CurrentSpeed = FMath::Clamp(CurrentSpeed + Acceleration * DeltaTime, 0.0f, MaxSpeed); // Hýzlan
+            CurrentSpeed = FMath::Clamp(CurrentSpeed + Acceleration * DeltaTime, 0.0f, MaxSpeed);
         }
     }
-    // Eðer geri hareket varsa
     else if (InputThrottle < 0.0f)
     {
-        // Eðer gemi ileri gidiyorsa, önce durmasý gerekiyor
         if (CurrentSpeed > 0.0f)
         {
-            CurrentSpeed = FMath::Max(CurrentSpeed - Deceleration * DeltaTime, 0.0f); // Yavaþça sýfýra getir
+            CurrentSpeed = FMath::Max(CurrentSpeed - Deceleration * DeltaTime, 0.0f);
         }
         else
         {
-            CurrentSpeed = FMath::Clamp(CurrentSpeed - Acceleration * DeltaTime, -MaxSpeed, 0.0f); // Geriye hýzlan
+            CurrentSpeed = FMath::Clamp(CurrentSpeed - Acceleration * DeltaTime, -MaxSpeed, 0.0f);
         }
     }
-    // Eðer giriþ yoksa (InputThrottle == 0.0f)
     else
     {
-        float FrictionDeceleration = 2.0f; // Sürtünme katsayýsý
+        float FrictionDeceleration = 2.0f;
 
         if (CurrentSpeed > 0.0f)
         {
-            CurrentSpeed = FMath::Max(0.0f, CurrentSpeed - FrictionDeceleration * DeltaTime); // Ýleri hareketi yavaþlat
+            CurrentSpeed = FMath::Max(0.0f, CurrentSpeed - FrictionDeceleration * DeltaTime);
         }
         else if (CurrentSpeed < 0.0f)
         {
-            CurrentSpeed = FMath::Min(0.0f, CurrentSpeed + FrictionDeceleration * DeltaTime); // Geri hareketi yavaþlat
+            CurrentSpeed = FMath::Min(0.0f, CurrentSpeed + FrictionDeceleration * DeltaTime);
         }
     }
 
-    // Gemiyi hareket ettir
+    // Projectile Movement ile ileri yönlü hareket
     FVector ForwardVector = GetActorForwardVector();
-    FVector NewLocation = GetActorLocation() + (ForwardVector * CurrentSpeed * DeltaTime);
+    ProjectileMovementComponent->Velocity = ForwardVector * CurrentSpeed;
 
-    // Sabit su seviyesi
-    NewLocation.Z = DesiredWaterLevelZ;
-    SetActorLocation(NewLocation, true);
+    // Z seviyesi sabitleniyor
+    FVector Location = GetActorLocation();
+    Location.Z = DesiredWaterLevelZ;
+    SetActorLocation(Location);
+
 
     // Sallanma efekti
     SwayTime += DeltaTime;
@@ -115,26 +116,23 @@ void AShipPawn::Tick(float DeltaTime)
     BoatMesh->SetRelativeRotation(NewMeshRotation);
 }
 
-// Input setup
 void AShipPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
     Super::SetupPlayerInputComponent(PlayerInputComponent);
 
     PlayerInputComponent->BindAxis("MoveForward", this, &AShipPawn::MoveForward);
     PlayerInputComponent->BindAxis("Turn", this, &AShipPawn::Turn);
-
     PlayerInputComponent->BindAxis("TurnCamera", this, &AShipPawn::TurnCamera);
 
-    PlayerInputComponent->BindAction("Fire", IE_Pressed, this, &AShipPawn::Fire);
+    PlayerInputComponent->BindAction("Fire_R", IE_Pressed, this, &AShipPawn::Fire_R);
+    PlayerInputComponent->BindAction("Fire_L", IE_Pressed, this, &AShipPawn::Fire_L);
 }
 
-// Forward movement input
 void AShipPawn::MoveForward(float Value)
 {
     InputThrottle = Value;
 }
 
-// Turning input
 void AShipPawn::Turn(float Value)
 {
     FRotator NewRotation = GetActorRotation();
@@ -147,49 +145,35 @@ void AShipPawn::TurnCamera(float Value)
     AddControllerYawInput(Value);
 }
 
-void AShipPawn::Fire()
+void AShipPawn::Fire_R()
 {
-    if (GEngine)
-    {
-        // Ekrana mesaj yazdýr
-        GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, TEXT("Fire function called!"));
-    }
-
     if (CannonballClass)
     {
-        // Gemi sað tarafýna göre spawn pozisyonunu belirle
         FVector SpawnLocation = BoatMesh->GetComponentLocation() +
-            (GetActorForwardVector() * 15.0f) +  // Geminin ön kýsmýna bir miktar uzaklýk
-            (GetActorRightVector() * 30.0f);    // Geminin sað tarafýna bir miktar uzaklýk
+            (GetActorForwardVector() * 15.0f) +
+            (GetActorRightVector() * 30.0f);
 
-        // Gemi sað yönüne doðru rotasyonu ayarla
         FRotator SpawnRotation = GetActorRightVector().Rotation();
-        SpawnRotation.Pitch += 5.0f; // Negatif pitch yukarý yönlüdür
+        SpawnRotation.Pitch += 5.0f;
 
-
-        // Mermiyi spawn et
-        AActor* SpawnedCannonball = GetWorld()->SpawnActor<AActor>(CannonballClass, SpawnLocation, SpawnRotation);
-
-        if (SpawnedCannonball)
-        {
-            if (GEngine)
-            {
-                GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, TEXT("Cannonballlll spawned successfully to the right!"));
-            }
-        }
-        else
-        {
-            if (GEngine)
-            {
-                GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Failed to spawn Cannonball!"));
-            }
-        }
-    }
-    else
-    {
-        if (GEngine)
-        {
-            GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("CannonballClass is not set!"));
-        }
+        GetWorld()->SpawnActor<AActor>(CannonballClass, SpawnLocation, SpawnRotation);
     }
 }
+
+void AShipPawn::Fire_L()
+{
+    if (CannonballClass)
+    {
+        FVector SpawnLocation = BoatMesh->GetComponentLocation() +
+            (GetActorForwardVector() * 55.0f) -
+            (GetActorRightVector() * 30.0f);
+
+        FRotator SpawnRotation = (-GetActorRightVector()).Rotation();
+        SpawnRotation.Pitch += 5.0f;
+
+        GetWorld()->SpawnActor<AActor>(CannonballClass, SpawnLocation, SpawnRotation);
+    }
+}
+
+
+
