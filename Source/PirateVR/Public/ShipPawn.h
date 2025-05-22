@@ -3,6 +3,8 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/FloatingPawnMovement.h"
+class AWebSocketManager; // Forward declaration 
+
 #include "ShipPawn.generated.h"
 
 // Forward declarations
@@ -36,6 +38,18 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ship Control")
 	bool IsPlayer = true;
 
+	// Movement logic
+	void MoveForward(float Value);
+	void Turn(float Value);
+	void TurnCamera(float Value);
+
+	// Combat logic
+	UFUNCTION(BlueprintCallable, Category = "Combat")
+	void Fire_R();
+
+	UFUNCTION(BlueprintCallable, Category = "Combat")
+	void Fire_L();
+
 	
 private:
 	// Root component (needed for projectile movement)
@@ -49,6 +63,7 @@ private:
 	// Spring Arm for the camera
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	USpringArmComponent* SpringArm;
+
 
 	// Camera attached to the Spring Arm
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Components", meta = (AllowPrivateAccess = "true"))
@@ -86,18 +101,6 @@ private:
 	float SwayFrequency = 2.0f;
 
 	float SwayTime = 0.0f;
-
-	// Movement logic
-	void MoveForward(float Value);
-	void Turn(float Value);
-	void TurnCamera(float Value);
-
-	// Combat logic
-	UFUNCTION(BlueprintCallable, Category = "Combat")
-	void Fire_R();
-
-	UFUNCTION(BlueprintCallable, Category = "Combat")
-	void Fire_L();
 
 	// Cannonball Blueprint Reference
 	UPROPERTY(EditAnywhere, Category = "Combat")

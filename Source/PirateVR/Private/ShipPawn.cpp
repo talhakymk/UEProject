@@ -5,6 +5,8 @@
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/World.h"
+#include "WebSocketManager.h"
+#include "EngineUtils.h"
 
 AShipPawn::AShipPawn()
 {
@@ -54,6 +56,17 @@ void AShipPawn::BeginPlay()
     if (IsPlayer)
     {
         AutoPossessPlayer = EAutoReceiveInput::Player0;
+
+        // WebSocketManager aktörünü sahnede bul
+        for (TActorIterator<AWebSocketManager> It(GetWorld()); It; ++It)
+        {
+            AWebSocketManager* WSManager = *It;
+            if (WSManager)
+            {
+                WSManager->InitWebSocket(this); // Gemi referansýný gönder
+                break;
+            }
+        }
     }
 }
 
@@ -120,7 +133,7 @@ void AShipPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
     Super::SetupPlayerInputComponent(PlayerInputComponent);
 
-    PlayerInputComponent->BindAxis("MoveForward", this, &AShipPawn::MoveForward);
+   PlayerInputComponent->BindAxis("MoveForward", this, &AShipPawn::MoveForward);
     PlayerInputComponent->BindAxis("Turn", this, &AShipPawn::Turn);
     PlayerInputComponent->BindAxis("TurnCamera", this, &AShipPawn::TurnCamera);
 
@@ -131,6 +144,8 @@ void AShipPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 void AShipPawn::MoveForward(float Value)
 {
     InputThrottle = Value;
+    UE_LOG(LogTemp, Warning, TEXT("MoveForward from WebSocket: %f"), Value);
+
 }
 
 void AShipPawn::Turn(float Value)
@@ -138,6 +153,8 @@ void AShipPawn::Turn(float Value)
     FRotator NewRotation = GetActorRotation();
     NewRotation.Yaw += Value * TurnSpeed * GetWorld()->GetDeltaSeconds();
     SetActorRotation(NewRotation);
+    UE_LOG(LogTemp, Warning, TEXT("TURN from WebSocket: %f"), Value);
+
 }
 
 void AShipPawn::TurnCamera(float Value)
@@ -174,6 +191,8 @@ void AShipPawn::Fire_L()
         GetWorld()->SpawnActor<AActor>(CannonballClass, SpawnLocation, SpawnRotation);
     }
 }
+
+
 
 
 
