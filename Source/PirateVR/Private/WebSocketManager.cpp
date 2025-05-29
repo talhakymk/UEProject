@@ -3,6 +3,8 @@
 #include "Json.h"
 #include "JsonUtilities.h"
 #include "Modules/ModuleManager.h"
+#include "Algo/Accumulate.h" // Ortalama hesaplamak iÃ§in
+
 
 AWebSocketManager::AWebSocketManager()
 {
@@ -12,7 +14,7 @@ AWebSocketManager::AWebSocketManager()
 void AWebSocketManager::BeginPlay()
 {
     Super::BeginPlay();
-    // Not: InitWebSocket'i dýþarýdan çaðýrmalýsýn. Otomatik baþlatmak istersen buraya da koyabilirsin.
+    // Not: InitWebSocket'i dï¿½ï¿½arï¿½dan ï¿½aï¿½ï¿½rmalï¿½sï¿½n. Otomatik baï¿½latmak istersen buraya da koyabilirsin.
 }
 
 void AWebSocketManager::Tick(float DeltaTime)
@@ -29,7 +31,7 @@ void AWebSocketManager::InitWebSocket(AShipPawn* InShipPawn)
         FModuleManager::LoadModuleChecked<FWebSocketsModule>("WebSockets");
     }
 
-    Socket = FWebSocketsModule::Get().CreateWebSocket(TEXT("ws://192.168.106.234:81"));
+    Socket = FWebSocketsModule::Get().CreateWebSocket(TEXT("ws://192.168.159.234:81"));
 
     Socket->OnConnected().AddLambda([]()
         {
@@ -53,91 +55,64 @@ void AWebSocketManager::OnWebSocketMessage(const FString& Message)
 
     if (FJsonSerializer::Deserialize(Reader, JsonObject))
     {
-        // Heartbeat mesajlarýný atla
-        if (JsonObject->HasField(TEXT("heartbeat")))
-        {
-            return;
-        }
-
-        // Raw deðerler (debug için)
         int32 X = JsonObject->GetIntegerField(TEXT("x"));
         int32 Y = JsonObject->GetIntegerField(TEXT("y"));
+        int32 PotValue = JsonObject->GetIntegerField(TEXT("pot"));
 
-        // NORMALIZE EDÝLMÝÞ deðerleri kullan (-1.0 to 1.0)
-        float NormalizedX = 0.0f;
-        float NormalizedY = 0.0f;
-
-        if (JsonObject->HasField(TEXT("normalizedX")))
-        {
-            NormalizedX = JsonObject->GetNumberField(TEXT("normalizedX"));
-        }
-
-        if (JsonObject->HasField(TEXT("normalizedY")))
-        {
-            NormalizedY = JsonObject->GetNumberField(TEXT("normalizedY"));
-        }
-
-        // Status bilgileri (isteðe baðlý)
         FString XStatus = JsonObject->GetStringField(TEXT("xStatus"));
         FString YStatus = JsonObject->GetStringField(TEXT("yStatus"));
 
-        // Buton durumlarý
-        bool JsPressed = JsonObject->GetIntegerField(TEXT("jsBtn")) == 1;
+        bool Ext2Pressed = JsonObject->GetIntegerField(TEXT("extBtn2")) == 1;
         bool ExtPressed = JsonObject->GetIntegerField(TEXT("extBtn")) == 1;
 
         if (!ControlledShip) return;
 
-        // Dead zone uygula (küçük hareketleri filtrele)
-        const float DeadZone = 0.15f; // %15 dead zone
-
-        float ThrottleValue = 0.0f;
-        float TurnValue = 0.0f;
-
-        // Y ekseni  ileri/geri hareket (normalize edilmiþ deðer kullan)
-        if (FMath::Abs(NormalizedY) > DeadZone)
+        // Y ekseni iÃ§in filtreleme
+        YBuffer.Add(Y);
+        if (YBuffer.Num() > BufferSize)
         {
-            ThrottleValue = -NormalizedY; // Y'yi ters çevir (yukarý = ileri)
-            ThrottleValue = FMath::Clamp(ThrottleValue, -1.0f, 1.0f); // Güvenlik sýnýrý
+            YBuffer.RemoveAt(0);
         }
 
-        // X ekseni  sað/sol dönüþ (normalize edilmiþ deðer kullan)
-        if (FMath::Abs(NormalizedX) > DeadZone)
+        int32 YAverage = 0;
+        if (YBuffer.Num() > 0)
         {
-            TurnValue = NormalizedX;
-            TurnValue = FMath::Clamp(TurnValue, -1.0f, 1.0f); // Güvenlik sýnýrý
+            YAverage = Algo::Accumulate(YBuffer, 0) / YBuffer.Num();
         }
 
-        // Debug çýktýsý (deðerleri kontrol et)
-        if (ThrottleValue != 0.0f || TurnValue != 0.0f)
+        float ThrottleValue = YAverage;
+
+        // POT (dÃ¶nÃ¼ÅŸ) iÃ§in filtreleme
+        PotBuffer.Add(PotValue);
+        if (PotBuffer.Num() > BufferSize)
         {
-            UE_LOG(LogTemp, Warning, TEXT("Joystick Input - Throttle: %.3f, Turn: %.3f (Raw X:%d Y:%d)"),
-                ThrottleValue, TurnValue, X, Y);
+            PotBuffer.RemoveAt(0);
         }
 
-        // Gemi kontrolü
+        int32 PotAverage = 0;
+        if (PotBuffer.Num() > 0)
+        {
+            PotAverage = Algo::Accumulate(PotBuffer, 0) / PotBuffer.Num();
+        }
+
+        //float NormalizedPot = ((float)(PotAverage - 2100) / (4500 - 2100)) * 2.0f - 1.0f;
+        float NormalizedPot = ((float)PotAverage - 2048.0f) / 2048.0f;
+        NormalizedPot = FMath::Clamp(NormalizedPot, -1.0f, 1.0f);
+
+        // LOG ile test
+        UE_LOG(LogTemp, Warning, TEXT("POT raw: %d | avg: %d | normalized: %f"), PotValue, PotAverage, NormalizedPot);
+
         ControlledShip->MoveForward(ThrottleValue);
-        ControlledShip->Turn(TurnValue);
+        ControlledShip->TargetTurnValue = NormalizedPot;
 
-        // Buton kontrolleri (edge detection için static deðiþkenler)
-        static bool LastJsPressed = false;
-        static bool LastExtPressed = false;
-
-        // Joystick butonu basýldýðýnda (sadece ilk basýþta tetikle)
-        if (JsPressed && !LastJsPressed)
-        {
-            ControlledShip->Fire_L();
-            UE_LOG(LogTemp, Log, TEXT("Joystick button pressed - Fire L!"));
-        }
-
-        // Harici buton basýldýðýnda (sadece ilk basýþta tetikle)
-        if (ExtPressed && !LastExtPressed)
+        if (ExtPressed)
         {
             ControlledShip->Fire_R();
-            UE_LOG(LogTemp, Log, TEXT("External button pressed - Fire R!"));
         }
 
-        // Son durumlarý kaydet
-        LastJsPressed = JsPressed;
-        LastExtPressed = ExtPressed;
+        if (Ext2Pressed)
+        {
+            ControlledShip->Fire_L();
+        }
     }
 }

@@ -27,7 +27,7 @@ AShipPawn::AShipPawn()
     SpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
     SpringArm->SetupAttachment(RootComponent);
     SpringArm->TargetArmLength = 300.0f;
-    SpringArm->bUsePawnControlRotation = true;
+    SpringArm->bUsePawnControlRotation = false;
     SpringArm->SetRelativeLocation(FVector(0.0f, 0.0f, 100.0f));
 
 
@@ -75,7 +75,7 @@ void AShipPawn::Tick(float DeltaTime)
     Super::Tick(DeltaTime);
 
     // Ývme hesaplama
-    if (InputThrottle > 0.0f)
+    if (InputThrottle == 0.0f)
     {
         if (CurrentSpeed < 0.0f)
         {
@@ -86,7 +86,7 @@ void AShipPawn::Tick(float DeltaTime)
             CurrentSpeed = FMath::Clamp(CurrentSpeed + Acceleration * DeltaTime, 0.0f, MaxSpeed);
         }
     }
-    else if (InputThrottle < 0.0f)
+    else if (InputThrottle >= 3000.0f)
     {
         if (CurrentSpeed > 0.0f)
         {
@@ -94,7 +94,7 @@ void AShipPawn::Tick(float DeltaTime)
         }
         else
         {
-            CurrentSpeed = FMath::Clamp(CurrentSpeed - Acceleration * DeltaTime, -MaxSpeed, 0.0f);
+            //CurrentSpeed = FMath::Clamp(CurrentSpeed - Acceleration * DeltaTime, -MaxSpeed, 0.0f);
         }
     }
     else
@@ -110,6 +110,13 @@ void AShipPawn::Tick(float DeltaTime)
             CurrentSpeed = FMath::Min(0.0f, CurrentSpeed + FrictionDeceleration * DeltaTime);
         }
     }
+    CurrentTurnValue = FMath::FInterpTo(CurrentTurnValue, TargetTurnValue, DeltaTime, InterpSpeed);
+    AddActorLocalRotation(FRotator(0.0f, CurrentTurnValue * TurnSpeed * DeltaTime, 0.0f));
+
+    FRotator TargetRotation = GetActorRotation();
+    TargetRotation.Pitch = 0.0f; // Ýstersen eðimi sabitle
+    TargetRotation.Roll = 0.0f;  // Sallanma efekti sadece mesh'te kalmalý
+    SpringArm->SetWorldRotation(TargetRotation);
 
     // Projectile Movement ile ileri yönlü hareket
     FVector ForwardVector = GetActorForwardVector();
@@ -133,37 +140,61 @@ void AShipPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
     Super::SetupPlayerInputComponent(PlayerInputComponent);
 
-   PlayerInputComponent->BindAxis("MoveForward", this, &AShipPawn::MoveForward);
-    PlayerInputComponent->BindAxis("Turn", this, &AShipPawn::Turn);
-    PlayerInputComponent->BindAxis("TurnCamera", this, &AShipPawn::TurnCamera);
+    //PlayerInputComponent->BindAxis("MoveForward", this, &AShipPawn::MoveForward);
+    //PlayerInputComponent->BindAxis("Turn", this, &AShipPawn::Turn);
+    //PlayerInputComponent->BindAxis("TurnCamera", this, &AShipPawn::TurnCamera);
 
-    PlayerInputComponent->BindAction("Fire_R", IE_Pressed, this, &AShipPawn::Fire_R);
-    PlayerInputComponent->BindAction("Fire_L", IE_Pressed, this, &AShipPawn::Fire_L);
+    //PlayerInputComponent->BindAction("Fire_R", IE_Pressed, this, &AShipPawn::Fire_R);
+    //PlayerInputComponent->BindAction("Fire_L", IE_Pressed, this, &AShipPawn::Fire_L);
 }
 
 void AShipPawn::MoveForward(float Value)
 {
-    InputThrottle = Value;
     UE_LOG(LogTemp, Warning, TEXT("MoveForward from WebSocket: %f"), Value);
+
+    InputThrottle = Value;
 
 }
 
 void AShipPawn::Turn(float Value)
 {
-    FRotator NewRotation = GetActorRotation();
-    NewRotation.Yaw += Value * TurnSpeed * GetWorld()->GetDeltaSeconds();
-    SetActorRotation(NewRotation);
-    UE_LOG(LogTemp, Warning, TEXT("TURN from WebSocket: %f"), Value);
+    float DeltaTime = GetWorld()->GetDeltaSeconds();
+
+    // Interpolation speed ayarý
+    //float InterpSpeed = 3.0f;           // FInterpTo için
+    float ConstantInterpSpeed = 2.0f;   // FInterpConstantTo için
+
+    // Sabit hýzla yaklaþma
+    //CurrentTurnValue = FMath::FInterpConstantTo(CurrentTurnValue, Value, DeltaTime, ConstantInterpSpeed);
+
+    // Alternatif: Yorum açarsan bu satýrý test et
+     CurrentTurnValue = FMath::FInterpTo(CurrentTurnValue, Value, DeltaTime, InterpSpeed);
+
+    UE_LOG(LogTemp, Log, TEXT("TURN (smoothed): %f | Target: %f"), CurrentTurnValue, Value);
+
+    AddActorLocalRotation(FRotator(0.0f, CurrentTurnValue * TurnSpeed * DeltaTime, 0.0f));
 
 }
 
-void AShipPawn::TurnCamera(float Value)
+/*void AShipPawn::TurnCamera(float Value)
 {
     AddControllerYawInput(Value);
-}
+}*/
 
 void AShipPawn::Fire_R()
 {
+    if (IsPlayer)
+    {
+        float CurrentTime = GetWorld()->GetTimeSeconds();
+        if (CurrentTime - LastFireTime_R < FireCooldown)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("Fire_R on cooldown!"));
+            return;
+        }
+
+        LastFireTime_R = CurrentTime;
+    }
+
     if (CannonballClass)
     {
         FVector SpawnLocation = BoatMesh->GetComponentLocation() +
@@ -179,6 +210,18 @@ void AShipPawn::Fire_R()
 
 void AShipPawn::Fire_L()
 {
+    if (IsPlayer)
+    {
+        float CurrentTime = GetWorld()->GetTimeSeconds();
+        if (CurrentTime - LastFireTime_R < FireCooldown)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("Fire_L on cooldown!"));
+            return;
+        }
+
+        LastFireTime_R = CurrentTime;
+    }
+
     if (CannonballClass)
     {
         FVector SpawnLocation = BoatMesh->GetComponentLocation() +

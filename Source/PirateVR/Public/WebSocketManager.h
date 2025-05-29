@@ -23,6 +23,10 @@ public:
     void OnWebSocketMessage(const FString& Message);
 
 private:
+    TArray<int32> YBuffer; // Y ekseni için gelen verileri tutacak buffer
+    int32 BufferSize = 5;
     TSharedPtr<IWebSocket> Socket;
     AShipPawn* ControlledShip;
+
+    TArray<int32> PotBuffer;  // Burada eksik olan satýr bu
 };

@@ -50,6 +50,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Combat")
 	void Fire_L();
 
+	float TargetTurnValue = 0.0f;
+	float InterpSpeed = 5.0f;
+
+
 	
 private:
 	// Root component (needed for projectile movement)
@@ -79,7 +83,7 @@ private:
 
 	// Movement variables
 	UPROPERTY(EditAnywhere, Category = "Movement")
-	float MaxSpeed = 1200.0f;
+	float MaxSpeed = 500.0f;
 
 	UPROPERTY(EditAnywhere, Category = "Movement")
 	float Acceleration = 200.0f;
@@ -90,8 +94,13 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Movement")
 	float TurnSpeed = 50.0f;
 
+
 	float CurrentSpeed = 0.0f;
-	float InputThrottle = 0.0f;
+	float InputThrottle = 1800.0f;
+	float LastFireTime_R = -999.0f;
+	float LastFireTime_L = -999.0f;
+	float FireCooldown = 1.0f;
+	float CurrentTurnValue = 0.0f;
 
 	// Oscillation variables for swaying effect
 	UPROPERTY(EditAnywhere, Category = "Sway")
